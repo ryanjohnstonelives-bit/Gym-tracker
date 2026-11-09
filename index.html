@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Apex Lift & Incline</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --surface: #151d30;
+      --card: #1c2640;
+      --card-border: #2c3a5e;
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.25);
+      --success: #22c55e;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; touch-action: manipulation; }
+    body { background: var(--bg); color: var(--text); padding-bottom: 90px; }
+    
+    header { background: var(--surface); padding: 16px 20px; border-bottom: 1px solid var(--card-border); position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; }
+    header h1 { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.02em; }
+    .badge { background: var(--accent-glow); color: var(--accent); padding: 4px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; }
+
+    /* REST TIMER BAR */
+    #timer-banner { display: none; background: #0284c7; color: #fff; padding: 12px 20px; position: sticky; top: 57px; z-index: 90; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+    #timer-display { font-size: 1.4rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .timer-btn { background: rgba(255,255,255,0.2); border: none; color: #fff; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 0.8rem; cursor: pointer; }
+
+    .container { padding: 16px; max-width: 520px; margin: 0 auto; }
+    .exercise-scroller { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 16px; -webkit-overflow-scrolling: touch; }
+    .chip { background: var(--surface); border: 1px solid var(--card-border); color: var(--muted); padding: 10px 16px; border-radius: 12px; white-space: nowrap; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+    .chip.active { background: var(--accent); color: #0b0f19; font-weight: 800; border-color: var(--accent); box-shadow: 0 0 12px var(--accent-glow); }
+
+    .card { background: var(--surface); border: 1px solid var(--card-border); border-radius: 16px; padding: 18px; margin-bottom: 16px; }
+    .card-title { font-size: 1.1rem; font-weight: 800; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: baseline; }
+    .prev-badge { font-size: 0.75rem; color: var(--muted); margin-bottom: 16px; }
+
+    /* TAP CONTROLS */
+    .control-group { margin-bottom: 16px; }
+    .control-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 700; margin-bottom: 8px; }
+    .dial { display: flex; align-items: center; justify-content: space-between; background: var(--card); border: 1px solid var(--card-border); border-radius: 12px; padding: 6px 10px; }
+    .dial-val { font-size: 1.6rem; font-weight: 800; color: #fff; width: 90px; text-align: center; }
+    .tap-btn { background: #263354; border: 1px solid var(--card-border); color: #fff; width: 44px; height: 44px; border-radius: 10px; font-size: 1.2rem; font-weight: 800; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .tap-btn:active { background: var(--accent); color: #0b0f19; }
+    .steppers { display: flex; gap: 6px; margin-top: 6px; }
+    .step-chip { background: transparent; border: 1px solid var(--card-border); color: var(--muted); font-size: 0.75rem; font-weight: 700; padding: 6px 10px; border-radius: 8px; flex: 1; text-align: center; cursor: pointer; }
+    .step-chip:active { border-color: var(--accent); color: var(--accent); }
+
+    /* ACTION BUTTONS */
+    .btn-log { background: var(--accent); color: #0b0f19; width: 100%; border: none; padding: 16px; border-radius: 12px; font-size: 1rem; font-weight: 800; cursor: pointer; box-shadow: 0 4px 16px var(--accent-glow); margin-top: 8px; }
+    .btn-log:active { transform: scale(0.98); }
+
+    /* SETS LOG */
+    .set-list { margin-top: 14px; border-top: 1px solid var(--card-border); padding-top: 10px; }
+    .set-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; font-size: 0.9rem; border-bottom: 1px solid rgba(255,255,255,0.03); }
+    .del-set { color: #ef4444; background: none; border: none; font-size: 1.1rem; padding: 4px 8px; cursor: pointer; }
+
+    /* SUMMARY BOTTOM BAR */
+    .dock { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--card-border); padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 100; }
+    .stat-meta { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; font-weight: 700; }
+    .stat-num { font-size: 1.2rem; font-weight: 800; color: var(--accent); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>APEX TRACKER</h1>
+    <span class="badge" id="session-sets-count">0 SETS DONE</span>
+  </header>
+
+  <!-- POP-DOWN REST TIMER -->
+  <div id="timer-banner">
+    <div>
+      <span style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Rest Timer</span>
+      <div id="timer-display">01:30</div>
+    </div>
+    <div style="display: flex; gap: 6px;">
+      <button class="timer-btn" onclick="addRest(30)">+30s</button>
+      <button class="timer-btn" onclick="stopTimer()">Skip</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- HORIZONTAL EXERCISE SELECTOR -->
+    <div class="exercise-scroller" id="exercise-pills">
+      <div class="chip active" onclick="selectExercise('Shoulder Press', 40, 10)">Shoulder Press</div>
+      <div class="chip" onclick="selectExercise('Chest Press', 25, 10)">Chest Press</div>
+      <div class="chip" onclick="selectExercise('Seated Row', 27.5, 10)">Seated Row</div>
+      <div class="chip" onclick="selectExercise('Lat Pulldown', 37.5, 10)">Lat Pulldown</div>
+      <div class="chip" onclick="selectExercise('Tricep Press', 40, 10)">Tricep Press</div>
+      <div class="chip" onclick="selectExercise('Leg Press', 60, 10)">Leg Press</div>
+    </div>
+
+    <!-- MAIN ACTIVE DIAL CARD -->
+    <div class="card">
+      <div class="card-title">
+        <span id="active-title">Shoulder Press</span>
+        <span style="font-size: 0.8rem; color: var(--accent);" id="set-index-label">Set 1</span>
+      </div>
+      <div class="prev-badge" id="prev-target">Baseline: 40kg x 10 reps</div>
+
+      <!-- WEIGHT DIAL -->
+      <div class="control-group">
+        <div class="control-label">Weight (kg)</div>
+        <div class="dial">
+          <button class="tap-btn" onclick="stepVal('weight', -2.5)">−</button>
+          <div class="dial-val" id="val-weight">40</div>
+          <button class="tap-btn" onclick="stepVal('weight', 2.5)">+</button>
+        </div>
+        <div class="steppers">
+          <div class="step-chip" onclick="stepVal('weight', -5)">-5kg</div>
+          <div class="step-chip" onclick="stepVal('weight', -1.25)">-1.25kg</div>
+          <div class="step-chip" onclick="stepVal('weight', 1.25)">+1.25kg</div>
+          <div class="step-chip" onclick="stepVal('weight', 5)">+5kg</div>
+        </div>
+      </div>
+
+      <!-- REPS DIAL -->
+      <div class="control-group">
+        <div class="control-label">Reps Completed</div>
+        <div class="dial">
+          <button class="tap-btn" onclick="stepVal('reps', -1)">−</button>
+          <div class="dial-val" id="val-reps">10</div>
+          <button class="tap-btn" onclick="stepVal('reps', 1)">+</button>
+        </div>
+        <div class="steppers">
+          <div class="step-chip" onclick="setVal('reps', 8)">8 Reps</div>
+          <div class="step-chip" onclick="setVal('reps', 10)">10 Reps</div>
+          <div class="step-chip" onclick="setVal('reps', 12)">12 Reps</div>
+        </div>
+      </div>
+
+      <button class="btn-log" onclick="logSet()">LOG SET & START REST</button>
+
+      <!-- LOGGED SETS FOR CURRENT MOVEMENT -->
+      <div class="set-list" id="current-ex-sets"></div>
+    </div>
+  </div>
+
+  <!-- FIXED BOTTOM METRICS DOCK -->
+  <div class="dock">
+    <div>
+      <div class="stat-meta">Total Tonnage</div>
+      <div class="stat-num" id="dock-volume">0 kg</div>
+    </div>
+    <button class="timer-btn" style="background: #263354; padding: 10px 16px;" onclick="resetWorkout()">New Session</button>
+  </div>
+
+  <script>
+    let activeExercise = 'Shoulder Press';
+    let currentWeight = 40;
+    let currentReps = 10;
+    let sessionSets = [];
+    let timerInterval = null;
+
+    const baselines = {
+      'Shoulder Press': 'Top: 40kg x 10 | Target: Beat 40kg or hit 30kg x 12',
+      'Chest Press': 'Top: 25kg x 10 | Try hitting fresh first for higher load',
+      'Seated Row': 'Top: 27.5kg x 10 | Target: 30kg x 8-10',
+      'Lat Pulldown': 'Top: 37.5kg x 10 | Solid rebound last session',
+      'Tricep Press': 'Top: 40kg x 10 | Target: 42.5kg opener',
+      'Leg Press': 'Starting gauge: 50kg-60kg x 10'
+    };
+
+    function selectExercise(name, defaultWeight, defaultReps) {
+      activeExercise = name;
+      currentWeight = defaultWeight;
+      currentReps = defaultReps;
+      
+      document.querySelectorAll('.chip').forEach(c => {
+        c.classList.toggle('active', c.innerText === name);
+      });
+
+      document.getElementById('active-title').innerText = name;
+      document.getElementById('prev-target').innerText = baselines[name] || 'Custom Movement';
+      updateDials();
+      renderCurrentExerciseSets();
+    }
+
+    function stepVal(type, delta) {
+      if (type === 'weight') {
+        currentWeight = Math.max(0, currentWeight + delta);
+      } else {
+        currentReps = Math.max(1, currentReps + delta);
+      }
+      updateDials();
+    }
+
+    function setVal(type, val) {
+      if (type === 'reps') currentReps = val;
+      updateDials();
+    }
+
+    function updateDials() {
+      document.getElementById('val-weight').innerText = currentWeight;
+      document.getElementById('val-reps').innerText = currentReps;
+    }
+
+    function logSet() {
+      sessionSets.push({
+        exercise: activeExercise,
+        weight: currentWeight,
+        reps: currentReps,
+        volume: currentWeight * currentReps,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      });
+
+      renderCurrentExerciseSets();
+      updateTotals();
+      startRest(90);
+    }
+
+    function renderCurrentExerciseSets() {
+      const list = document.getElementById('current-ex-sets');
+      const filtered = sessionSets.filter(s => s.exercise === activeExercise);
+      
+      document.getElementById('set-index-label').innerText = `Set ${filtered.length + 1}`;
+
+      if (filtered.length === 0) {
+        list.innerHTML = `<div style="font-size:0.75rem; color:var(--muted); text-align:center; padding: 6px 0;">No sets logged for ${activeExercise} yet.</div>`;
+        return;
+      }
+
+      list.innerHTML = filtered.map((s, idx) => `
+        <div class="set-item">
+          <div><strong style="color:var(--accent);">Set ${idx + 1}</strong>: ${s.weight}kg × ${s.reps} reps</div>
+          <div style="color:var(--muted); font-size:0.8rem;">${s.volume} kg</div>
+        </div>
+      `).join('');
+    }
+
+    function updateTotals() {
+      const vol = sessionSets.reduce((sum, s) => sum + s.volume, 0);
+      document.getElementById('dock-volume').innerText = vol.toLocaleString() + ' kg';
+      document.getElementById('session-sets-count').innerText = `${sessionSets.length} SETS DONE`;
+    }
+
+    /* REST TIMER FUNCTIONS */
+    function startRest(seconds) {
+      clearInterval(timerInterval);
+      const banner = document.getElementById('timer-banner');
+      banner.style.display = 'flex';
+      let remaining = seconds;
+
+      function tick() {
+        const mins = Math.floor(remaining / 60);
+        const secs = remaining % 60;
+        document.getElementById('timer-display').innerText = 
+          `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        
+        if (remaining <= 0) {
+          clearInterval(timerInterval);
+          if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+          stopTimer();
+        }
+        remaining--;
+      }
+      tick();
+      timerInterval = setInterval(tick, 1000);
+    }
+
+    function addRest(sec) {
+      startRest(90 + sec);
+    }
+
+    function stopTimer() {
+      clearInterval(timerInterval);
+      document.getElementById('timer-banner').style.display = 'none';
+    }
+
+    function resetWorkout() {
+      if (confirm("Reset current session data?")) {
+        sessionSets = [];
+        updateTotals();
+        renderCurrentExerciseSets();
+        stopTimer();
+      }
+    }
+  </script>
+</body>
+</html>
